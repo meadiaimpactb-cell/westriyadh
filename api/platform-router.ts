@@ -87,7 +87,6 @@ export const platformRouter = createRouter({
       const db = getDb();
       const { companyName, cr, ...profile } = input;
       await db.update(s.users).set({ ...profile, profileDone: true }).where(eq(s.users.id, ctx.user.id));
-      // صاحب عمل: إنشاء ملف الشركة
       if (input.accountType === "employer" && companyName) {
         const existing = await db.query.companies.findFirst({ where: eq(s.companies.ownerId, ctx.user.id) });
         if (!existing) {
@@ -166,3 +165,184 @@ export const platformRouter = createRouter({
       });
       return { ok: true, balance: ctx.user.points + total };
     }),
+
+  spendPoints: authedQuery
+    .input(z.object({ amount: z.number().positive(), kind: z.enum(["ai_ad", "promote3", "promote7", "cv_logo"]), jobId: z.number().optional() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+      const me = await db.query.users.findFirst({ where: eq(s.users.id, ctx.user.id) });
+      if (!me || me.points < input.amount) throw new TRPCError({ code: "BAD_REQUEST", message: "رصيد النقاط غير كافٍ" });
+      await db.transaction(async (tx) => {
+        await tx.update(s.users).set({ points: me.points - input.amount, cvLogoFree: input.kind === "cv_logo" ? true : me.cvLogoFree }).where(eq(s.users.id, me.id));
+        await tx.insert(s.pointsTx).values({ userId: me.id, delta: -input.amount, kind: input.kind });
+        if ((input.kind === "promote3" || input.kind === "promote7") && input.jobId) {
+          const days = input.kind === "promote3" ? 3 : 7;
+          await tx.update(s.jobs).set({ promotedUntil: new Date(Date.now() + days * 864e5) }).where(eq(s.jobs.id, input.jobId));
+        }
+      });
+      return { ok: true, balance: me.points - input.amount };
+    }),
+
+  // خدمة مدفوعة نقداً للأفراد (إزالة شعار السيرة) — بوابة الدفع تُربط من الأدمن
+  payCvLogo: authedQuery
+    .input(z.object({ gateway: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+      await db.transaction(async (tx) => {
+        await tx.update(s.users).set({ cvLogoFree: true }).where(eq(s.users.id, ctx.user.id));
+        await tx.insert(s.pointsTx).values({ userId: ctx.user.id, delta: 0, kind: "cv_logo", note: `دفع نقدي عبر ${input.gateway} (وضع اختبار)` });
+      });
+      return { ok: true };
+    }),
+
+  // ══ صاحب العمل ════════════════════════════════════════════════════════════
+  myCompany: authedQuery.query(async ({ ctx }) => {
+    return getDb().query.companies.findFirst({ where: eq(s.companies.ownerId, ctx.user.id) });
+  }),
+
+  myJobs: authedQuery.query(async ({ ctx }) => {
+    const db = getDb();
+    const comp = await db.query.companies.findFirst({ where: eq(s.companies.ownerId, ctx.user.id) });
+    if (!comp) return { company: null, jobs: [] };
+    const rows = await db.select().from(s.jobs).where(eq(s.jobs.companyId, comp.id)).orderBy(desc(s.jobs.createdAt));
+    const counts = await db.select().from(s.applications);
+    return {
+      company: comp,
+      jobs: rows.map(j => ({
+        ...j,
+        promoted: j.promotedUntil ? j.promotedUntil > new Date() : false,
+        applicants: counts.filter(a => a.jobId === j.id).length,
+      })),
+    };
+  }),
+
+  createJob: authedQuery
+    .input(z.object({
+      titleAr: z.string().min(2), titleEn: z.string().min(2),
+      hoodId: z.number(), salaryMin: z.number().min(0), salaryMax: z.number().min(0),
+      type: z.enum(["full", "part", "shift"]), skills: z.array(z.string()),
+      hoursAr: z.string().optional(), hoursEn: z.string().optional(),
+      descAr: z.string().optional(), descEn: z.string().optional(),
+      reqAr: z.array(z.string()).optional(), reqEn: z.array(z.string()).optional(),
+      brandColor: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+      const comp = await db.query.companies.findFirst({ where: eq(s.companies.ownerId, ctx.user.id) });
+      if (!comp) throw new TRPCError({ code: "BAD_REQUEST", message: "أكمل بيانات المنشأة أولاً" });
+      // لا نشر ببيانات ناقصة — تحقق الاكتمال (بند معتمد)
+      const missing: string[] = [];
+      if (!input.descAr) missing.push("descAr");
+      if (!input.salaryMin || !input.salaryMax) missing.push("salary");
+      if (!input.skills.length) missing.push("skills");
+      if (!input.hoursAr) missing.push("hours");
+      if (missing.length) throw new TRPCError({ code: "BAD_REQUEST", message: "بيانات ناقصة: " + missing.join(",") });
+      const [{ id }] = await db.insert(s.jobs).values({ ...input, companyId: comp.id }).$returningId();
+      return { ok: true, id };
+    }),
+
+  candidates: authedQuery.query(async ({ ctx }) => {
+    const db = getDb();
+    const comp = await db.query.companies.findFirst({ where: eq(s.companies.ownerId, ctx.user.id) });
+    if (!comp) return [];
+    const myJobs = await db.select().from(s.jobs).where(eq(s.jobs.companyId, comp.id));
+    const jobIds = myJobs.map(j => j.id);
+    if (!jobIds.length) return [];
+    const apps = await db.query.applications.findMany();
+    const mine = apps.filter(a => jobIds.includes(a.jobId));
+    const allUsers = await db.query.users.findMany();
+    const hoods = await db.query.neighborhoods.findMany();
+    const hmap = new Map(hoods.map(h => [h.id, h]));
+    const jmap = new Map(myJobs.map(j => [j.id, j]));
+    return mine.map(a => {
+      const u = allUsers.find(x => x.id === a.seekerId);
+      const j = jmap.get(a.jobId);
+      const uh = u?.hoodId ? hmap.get(u.hoodId) : null;
+      const jh = j ? hmap.get(j.hoodId) : null;
+      const km = uh && jh ? haversineKm(uh, jh) : null;
+      return { app: a, user: u ? { id: u.id, name: u.name, skills: u.skills, expYears: u.expYears, hood: uh } : null, job: j, commuteKm: km ? +km.toFixed(1) : null };
+    });
+  }),
+
+  setApplicationStatus: authedQuery
+    .input(z.object({
+      id: z.number(),
+      status: z.enum(["seen", "shortlist", "interview", "rejected", "hired"]),
+      rejectionReason: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      if (input.status === "rejected" && !input.rejectionReason)
+        throw new TRPCError({ code: "BAD_REQUEST", message: "سبب عدم القبول إلزامي" });
+      await getDb().update(s.applications)
+        .set({ status: input.status, rejectionReason: input.status === "rejected" ? input.rejectionReason : null })
+        .where(eq(s.applications.id, input.id));
+      return { ok: true };
+    }),
+
+  // ══ الأدمن ════════════════════════════════════════════════════════════════
+  admin: createRouter({
+    stats: adminQuery.query(async () => {
+      const db = getDb();
+      const [u, j, a, c] = await Promise.all([
+        db.query.users.findMany(), db.query.jobs.findMany(),
+        db.query.applications.findMany(), db.query.companies.findMany(),
+      ]);
+      return {
+        users: u.length, seekers: u.filter(x => x.accountType === "seeker").length,
+        employers: c.length, jobs: j.filter(x => x.status === "active").length,
+        applications: a.length, hired: a.filter(x => x.status === "hired").length,
+      };
+    }),
+
+    users: adminQuery.query(() => getDb().query.users.findMany({ orderBy: (t, { desc }) => [desc(t.createdAt)] })),
+
+    setSetting: adminQuery
+      .input(z.object({ key: z.string(), value: z.any() }))
+      .mutation(async ({ input }) => {
+        const db = getDb();
+        await db.insert(s.settings).values({ key: input.key, value: input.value })
+          .onDuplicateKeyUpdate({ set: { value: input.value } });
+        return { ok: true };
+      }),
+
+    addHood: adminQuery
+      .input(z.object({ nameAr: z.string().min(2), nameEn: z.string().min(2), zone: z.enum(["west", "south"]), lat: z.number(), lng: z.number() }))
+      .mutation(async ({ input }) => { await getDb().insert(s.neighborhoods).values(input); return { ok: true }; }),
+
+    updateHood: adminQuery
+      .input(z.object({ id: z.number(), nameAr: z.string().optional(), nameEn: z.string().optional(), zone: z.enum(["west", "south"]).optional(), lat: z.number().optional(), lng: z.number().optional(), active: z.boolean().optional() }))
+      .mutation(async ({ input }) => {
+        const { id, ...data } = input;
+        await getDb().update(s.neighborhoods).set(data).where(eq(s.neighborhoods.id, id));
+        return { ok: true };
+      }),
+
+    deleteHood: adminQuery
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => { await getDb().delete(s.neighborhoods).where(eq(s.neighborhoods.id, input.id)); return { ok: true }; }),
+
+    addNews: adminQuery
+      .input(z.object({ textAr: z.string().min(2), textEn: z.string().min(2) }))
+      .mutation(async ({ input }) => { await getDb().insert(s.news).values(input); return { ok: true }; }),
+
+    deleteNews: adminQuery
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => { await getDb().delete(s.news).where(eq(s.news.id, input.id)); return { ok: true }; }),
+
+    savePolicy: adminQuery
+      .input(z.object({ slug: z.string(), bodyAr: z.string(), bodyEn: z.string() }))
+      .mutation(async ({ input }) => {
+        await getDb().insert(s.policies).values(input)
+          .onDuplicateKeyUpdate({ set: { bodyAr: input.bodyAr, bodyEn: input.bodyEn } });
+        return { ok: true };
+      }),
+
+    addReason: adminQuery
+      .input(z.object({ textAr: z.string().min(2), textEn: z.string().min(2) }))
+      .mutation(async ({ input }) => { await getDb().insert(s.rejectionReasons).values(input); return { ok: true }; }),
+
+    closeJob: adminQuery
+      .input(z.object({ id: z.number(), status: z.enum(["active", "closed"]) }))
+      .mutation(async ({ input }) => { await getDb().update(s.jobs).set({ status: input.status }).where(eq(s.jobs.id, input.id)); return { ok: true }; }),
+  }),
+});
