@@ -1,8 +1,10 @@
+import { arPart2 } from './ar2';
+
 export type Lang = 'ar' | 'en';
 
 type StringsType = { [key: string]: any };
 
-const ar: StringsType = {
+const arBase = {
   brand: 'ملتقى توظيف غرب الرياض',
   brandShort: 'غرب الرياض',
   domain: 'westriyadh.net',
@@ -91,3 +93,8 @@ const ar: StringsType = {
     detect: 'تحديد موقعي تلقائياً', detecting: 'جارٍ تحديد موقعك…', detected: 'تم تحديد موقعك — أقرب حي:', locDenied: 'تعذّر الوصول للموقع — اختر حيّك يدوياً ويمكنك تعديله لاحقاً من ملفك',
     locNote: 'المنصة مبنية على الموقع: فعّل تحديد المكان لنلتقط إحداثياتك ونحسب زمن رحلتك بدقة — تُستخدم للمطابقة فقط.', zoneWest: 'غرب الرياض', zoneSouth: 'جنوب الرياض',
   },
+};
+
+const ar: StringsType = { ...arBase, ...arPart2 };
+
+export default ar;
