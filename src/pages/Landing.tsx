@@ -53,7 +53,6 @@ export default function Landing() {
         </div>
       )}
 
-      {/* ── Hero ── */}
       <section className="brand-panel relative overflow-hidden">
         <div className="grid-texture absolute inset-0" />
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 pt-16 pb-20 lg:pt-24 lg:pb-28 grid lg:grid-cols-[1.15fr_0.85fr] gap-12 items-center">
@@ -86,7 +85,6 @@ export default function Landing() {
             </div>
           </div>
 
-          {/* حاسبة التنقل */}
           <div className="fade-up" style={{ animationDelay: '0.15s' }}>
             <div className="rounded-3xl border border-white/12 bg-white/[0.06] backdrop-blur-md p-6 lg:p-7 shadow-2xl shadow-black/40">
               <div className="flex items-center gap-3 mb-1">
@@ -124,7 +122,6 @@ export default function Landing() {
           </div>
         </div>
 
-        {/* شريط الأحياء */}
         <div className="relative border-t border-white/10 py-3.5 overflow-hidden">
           <div className="ticker-track gap-10 px-6">
             {[...hoods, ...hoods].map((n, i) => (
@@ -138,7 +135,6 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ── المؤشرات ── */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 py-12">
         <div className="surface-card p-6 lg:p-8 grid grid-cols-2 lg:grid-cols-4 gap-6">
           {[
@@ -153,3 +149,142 @@ export default function Landing() {
         </div>
         <p className="text-center text-[0.7rem] text-[hsl(var(--muted-foreground))] mt-3">{t.stats.source} · {t.stats.editable}</p>
       </section>
+
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 py-14">
+        <SectionHead eyebrow="HOW" title={t.how.title} sub={t.how.sub} />
+        <div className="grid md:grid-cols-3 gap-5">
+          {[
+            { icon: MapPin, tt: t.how.s1t, d: t.how.s1d, n: '01', c: '#2BB3A3' },
+            { icon: Search, tt: t.how.s2t, d: t.how.s2d, n: '02', c: '#F5A623' },
+            { icon: BellRing, tt: t.how.s3t, d: t.how.s3d, n: '03', c: '#8B5CF6' },
+          ].map((s, i) => (
+            <div key={i} className="surface-card p-7 relative overflow-hidden group hover:border-[hsl(var(--teal-500))] transition-colors">
+              <span className="absolute top-4 end-5 font-black text-4xl text-[hsl(var(--teal-50))] font-mono-num">{s.n}</span>
+              <span className="w-11 h-11 rounded-xl text-white flex items-center justify-center mb-5" style={{ background: s.c }}><s.icon size={20} /></span>
+              <h3 className="font-extrabold text-lg text-[#1B2A33]">{s.tt}</h3>
+              <p className="text-sm text-[hsl(var(--muted-foreground))] leading-relaxed mt-2">{s.d}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="brand-panel py-16 lg:py-20 relative overflow-hidden">
+        <div className="grid-texture absolute inset-0 opacity-60" />
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6">
+          <div className="flex items-center gap-3 mb-2"><BrainCircuit className="text-[#7CE3C4]" size={26} /><span className="eyebrow !text-[#7CE3C4]">AI LAYER</span></div>
+          <SectionHead title={t.ai.title} sub={t.ai.sub} light />
+          <div className="grid md:grid-cols-2 gap-6">
+            {[
+              { icon: UserRound, title: t.ai.seekerTitle, items: [t.ai.f1, t.ai.f2, t.ai.f3, t.ai.f4, t.ai.f5], action: () => nav({ name: 'cv' }), cta: t.nav.cv },
+              { icon: Building2, title: t.ai.empTitle, items: [t.ai.g1, t.ai.g2, t.ai.g3, t.ai.g4, t.ai.g5], action: () => nav({ name: 'employer' }), cta: t.employersCta.cta },
+            ].map((col, i) => (
+              <div key={i} className="rounded-3xl border border-white/12 bg-white/[0.05] p-7">
+                <div className="flex items-center gap-3 mb-5">
+                  <span className="w-10 h-10 rounded-xl grad-bar text-white flex items-center justify-center"><col.icon size={19} /></span>
+                  <h3 className="text-white font-extrabold text-lg">{col.title}</h3>
+                </div>
+                <ul className="space-y-3">
+                  {col.items.map((f, j) => (
+                    <li key={j} className="flex gap-2.5 text-sm text-white/70 leading-relaxed">
+                      <Sparkles size={14} className="text-[#F5A623] shrink-0 mt-1" /> {f}
+                    </li>
+                  ))}
+                </ul>
+                <button onClick={col.action} className="btn btn-ghost-light btn-sm mt-6">{col.cta}</button>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 py-16">
+        <div className="flex items-end justify-between mb-8">
+          <SectionHead eyebrow="JOBS" title={t.jobs.title} sub={t.jobs.sub} />
+          <button onClick={() => nav({ name: 'jobs' })} className="btn btn-outline btn-md shrink-0 hidden sm:inline-flex mb-10">{t.jobs.details} ←</button>
+        </div>
+        <div className="grid gap-4">
+          {featured.length === 0 && <div className="surface-card p-8 text-center text-[hsl(var(--muted-foreground))]"><Loader2 className="animate-spin mx-auto" /></div>}
+          {featured.map(j => <JobCard key={j.id} job={j} hoods={hoods} myHoodId={myHoodId} speed={speed} applied={myApps.some(a => a.jobId === j.id)} onOpen={() => nav({ name: 'job', id: j.id })} />)}
+        </div>
+      </section>
+
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+        <div className="brand-panel rounded-3xl p-8 lg:p-12 relative overflow-hidden">
+          <div className="grid-texture absolute inset-0 opacity-50" />
+          <div className="relative grid lg:grid-cols-2 gap-8 items-center">
+            <div>
+              <h2 className="display-3 text-white">{t.employersCta.title}</h2>
+              <p className="text-white/60 mt-4 leading-relaxed">{t.employersCta.sub}</p>
+              <button onClick={() => nav({ name: user ? 'employer' : 'auth' })} className="btn btn-gold btn-lg mt-7">{t.employersCta.cta}</button>
+            </div>
+            <ul className="grid sm:grid-cols-2 gap-3">
+              {[t.employersCta.b1, t.employersCta.b2, t.employersCta.b3, t.employersCta.b4].map((b, i) => (
+                <li key={i} className="rounded-2xl border border-white/12 bg-white/[0.05] p-4 text-sm text-white/75 leading-relaxed flex gap-2">
+                  <span className="text-[#7CE3C4] font-black font-mono-num">0{i + 1}</span> {b}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 py-16">
+        <div className="grid lg:grid-cols-2 gap-10 items-center">
+          <div>
+            <span className="eyebrow">FLUTTER APP</span>
+            <h2 className="display-3 text-[#1B2A33] mt-3">{t.app.title}</h2>
+            <p className="text-[hsl(var(--muted-foreground))] mt-4 leading-relaxed">{t.app.sub}</p>
+            <ul className="mt-6 space-y-3">
+              {[t.app.f1, t.app.f2, t.app.f3].map((f, i) => (
+                <li key={i} className="flex gap-2.5 text-sm font-semibold text-[#1B2A33]"><Smartphone size={16} className="text-[hsl(var(--teal-600))] shrink-0 mt-0.5" />{f}</li>
+              ))}
+            </ul>
+            <div className="flex gap-3 mt-7">
+              {['App Store', 'Google Play'].map(s => (
+                <span key={s} className="btn btn-navy btn-md font-latin">{t.app.soon} {s}</span>
+              ))}
+            </div>
+          </div>
+          <div className="flex justify-center">
+            <div className="floaty w-[270px] rounded-[2.6rem] border-[10px] border-[#12232b] bg-white shadow-2xl overflow-hidden">
+              <div className="brand-panel px-5 pt-8 pb-5">
+                <p className="text-[#7CE3C4] text-[0.6rem] font-bold tracking-widest font-mono-num">WESTRIYADH.NET</p>
+                <p className="text-white font-extrabold mt-1 text-sm">{t.tagline}</p>
+                <div className="mt-3 bg-white/10 rounded-xl px-3 py-2 flex items-center gap-2 text-white/50 text-[0.68rem]"><Search size={11} /> {t.hero.searchJob}</div>
+              </div>
+              <div className="p-4 space-y-3">
+                {jobs.slice(0, 3).map(j => {
+                  const jh = hoods.find(h => h.id === j.hoodId);
+                  const mh = hoods.find(h => h.id === myHoodId);
+                  const km = jh && mh ? haversineKm(mh, jh) : null;
+                  return (
+                    <div key={j.id} className="border border-[hsl(var(--border))] rounded-xl p-3">
+                      <p className="font-bold text-[0.72rem] text-[#1B2A33]">{lang === 'ar' ? j.titleAr : j.titleEn}</p>
+                      <div className="flex gap-1.5 mt-1.5">
+                        {km !== null && <span className="chip !text-[0.58rem] !py-0.5"><MapPin size={9} /> {km.toFixed(1)} {t.hero.km}</span>}
+                        {km !== null && <span className="chip chip-gold !text-[0.58rem] !py-0.5"><Clock3 size={9} /> ~{commuteMinutes(km, speed)} {t.hero.min}</span>}
+                      </div>
+                    </div>
+                  );
+                })}
+                <div className="rounded-xl bg-[#F5A623]/10 border border-[#F5A623]/40 p-2.5 flex items-center gap-2">
+                  <BellRing size={13} className="text-[#F5A623]" />
+                  <p className="text-[0.62rem] font-bold text-[#96700a]">{t.dash.stShort}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {news.length > 0 && (
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 pb-8">
+          <div className="surface-card p-5 flex flex-wrap items-center gap-x-8 gap-y-2">
+            <span className="chip chip-teal"><FileText size={12} /> {t.admin.news}</span>
+            {news.map(n => <span key={n.id} className="text-sm text-[hsl(var(--muted-foreground))]">{lang === 'ar' ? n.textAr : n.textEn}</span>)}
+          </div>
+        </section>
+      )}
+    </div>
+  );
+}
