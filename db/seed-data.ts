@@ -75,3 +75,4 @@ export const JOBS: any[] = [
     "تشغيل نقاط البيع وخدمة العملاء في فرع السويدي بدوام جزئي مسائي.",
     "Operate POS and serve customers at the Suwaidi branch, evening part-time.",
     ["ثانوية عامة فأعلى", "دقة في التعامل مع النقد"], ["High school diploma", "Cash-handling accuracy"]],
+];

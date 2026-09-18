@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useStore } from '@/lib/store';
 import { SectionHead, LogoMark } from '@/components/shared';
-import { GUIDE_SEEKER, GUIDE_EMPLOYER, RoleKey } from './guide-content';
+import { GUIDE_SEEKER, GUIDE_EMPLOYER } from './guide-content';
+import type { RoleKey } from './guide-content';
 import { GUIDE_ADMIN } from './guide-admin';
 
 const CONTENT: Record<RoleKey, any> = {

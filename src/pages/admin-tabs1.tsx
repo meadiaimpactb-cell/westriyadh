@@ -43,7 +43,7 @@ export function DashTab({ t, stats, setSetting, seedManual, kpi }: any) {
   );
 }
 
-export function UsersTab({ t, users, hoods, lang }: any) {
+export function UsersTab({ t, users, hoods }: any) {
   return (
     <div className="fade-up overflow-x-auto">
       <table className="w-full text-sm">

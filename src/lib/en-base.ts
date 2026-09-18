@@ -1,4 +1,3 @@
-type StringsType = { [key: string]: any };
 
 const enBase = {
   brand: 'West Riyadh Careers Forum',
