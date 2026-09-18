@@ -3,7 +3,8 @@ import { useStore } from '@/lib/store';
 import { useAuth } from '@/hooks/useAuth';
 import { trpc } from '@/providers/trpc';
 import { LogoMark } from '@/components/shared';
-import { BrainCircuit, Link2, UploadCloud, Download, ImageDown, Sparkles, Lock, Unlock, CheckCircle2, Loader2, FileText } from 'lucide-react';
+import { Link2, UploadCloud, CheckCircle2, Loader2, FileText } from 'lucide-react';
+import { CvStepAI, CvStepPreview } from './cv-steps-34';
 
 const STEPS = ['stepData', 'stepLinks', 'stepAi', 'stepPreview'] as const;
 
@@ -157,3 +158,77 @@ export default function CvBuilder() {
               <div className="flex gap-2"><button onClick={() => setStep(0)} className="btn btn-outline btn-md">{t.common.back}</button><button onClick={() => { persist(); setStep(2); }} className="btn btn-navy btn-md flex-1">{t.common.next}</button></div>
             </div>
           )}
+
+          {step === 2 && <CvStepAI {...{ t, lang, aiReady, tailorId, setTailorId, jobs, genSummary, genGap, busy, aiOut, setAiOut, up, gaps, setStep, persist }} />}
+          {step === 3 && <CvStepPreview {...{ t, cvLang, setCvLang, logoFree, setPayOpen, logoPrice, downloadJpg, setStep }} />}
+        </div>
+
+        {/* المعاينة الحية */}
+        <div className="lg:sticky lg:top-24">
+          <div id="cv-print" dir={cvLang === 'ar' ? 'rtl' : 'ltr'} className="cv-paper relative overflow-hidden max-w-[560px] mx-auto">
+            {!logoFree && <div className="watermark-logo"><span className="font-black text-[64px] text-[#1B2A33] -rotate-[30deg] font-latin">westriyadh.net</span></div>}
+            <div className="brand-panel px-8 py-7 relative">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-2xl font-black text-white">{cv.name || (cvLang === 'ar' ? 'الاسم الكامل' : 'Full Name')}</h2>
+                  <p className="text-[#34C38F] font-bold mt-1">{cv.title || (cvLang === 'ar' ? 'المسمى المهني' : 'Professional Title')}</p>
+                  <p className="text-white/50 text-xs mt-2 tnum" dir="ltr">{cv.phone} {cv.email && `· ${cv.email}`}</p>
+                </div>
+                {!logoFree && <span className="shrink-0 opacity-90"><LogoMark size={40} /></span>}
+              </div>
+            </div>
+            <div className="h-1.5 grad-bar" />
+            <div className="p-8 space-y-6 relative">
+              <section>
+                <h3 className="text-xs font-black tracking-[0.15em] text-[hsl(var(--teal-600))] mb-2">{cvLang === 'ar' ? 'نبذة مهنية' : 'SUMMARY'}</h3>
+                <p className="text-sm leading-relaxed">{cv.summary || aiOut || '—'}</p>
+              </section>
+              <section>
+                <h3 className="text-xs font-black tracking-[0.15em] text-[hsl(var(--teal-600))] mb-2">{cvLang === 'ar' ? 'المهارات' : 'SKILLS'}</h3>
+                <div className="flex flex-wrap gap-1.5">{skillsArr.length ? skillsArr.map(s => <span key={s} className="chip">{s}</span>) : '—'}</div>
+              </section>
+              <section>
+                <h3 className="text-xs font-black tracking-[0.15em] text-[hsl(var(--teal-600))] mb-2">{cvLang === 'ar' ? 'الخبرات' : 'EXPERIENCE'}</h3>
+                <p className="text-sm leading-relaxed whitespace-pre-line">{cv.experience || '—'}</p>
+              </section>
+              <section>
+                <h3 className="text-xs font-black tracking-[0.15em] text-[hsl(var(--teal-600))] mb-2">{cvLang === 'ar' ? 'التعليم' : 'EDUCATION'}</h3>
+                <p className="text-sm">{cv.education || '—'}</p>
+              </section>
+              {(cv.linkedin || cv.twitter || cv.other) && (
+                <section>
+                  <h3 className="text-xs font-black tracking-[0.15em] text-[hsl(var(--teal-600))] mb-2">{cvLang === 'ar' ? 'الروابط' : 'LINKS'}</h3>
+                  <div className="text-xs font-latin text-[hsl(var(--muted-foreground))] space-y-1" dir="ltr">
+                    {cv.linkedin && <p>{cv.linkedin}</p>}{cv.twitter && <p>{cv.twitter}</p>}{cv.other && <p>{cv.other}</p>}
+                  </div>
+                </section>
+              )}
+            </div>
+            {!logoFree && <div className="border-t border-[hsl(var(--border))] py-2.5 text-center text-[0.65rem] font-bold text-[hsl(var(--teal-600))] font-latin tracking-widest">WESTRIYADH.NET</div>}
+          </div>
+        </div>
+      </div>
+
+      {payOpen && (
+        <div className="fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setPayOpen(false)}>
+          <div className="surface-card max-w-sm w-full p-6 fade-up" onClick={e => e.stopPropagation()}>
+            <h3 className="font-extrabold text-lg text-[#1B2A33]">{t.cv.payNow}</h3>
+            <p className="text-3xl font-black tnum text-[hsl(var(--teal-600))] my-3">{logoPrice} <span className="text-sm">{t.wallet.sar}</span></p>
+            <div className="space-y-2 mb-4">
+              {(['mada', 'applepay', 'visa', 'stcpay'] as const).filter(g => settings?.payments?.gateways?.[g]).map(g => (
+                <button key={g} disabled={spend.isPending}
+                  onClick={async () => {
+                    try { await spend.mutateAsync({ gateway: g }); setPayOpen(false); }
+                    catch { setPayOpen(false); }
+                  }}
+                  className="btn btn-outline btn-md w-full font-latin">{spend.isPending ? <Loader2 size={14} className="animate-spin" /> : null} {t.admin[g]}</button>
+              ))}
+            </div>
+            <p className="text-[0.68rem] text-[hsl(var(--muted-foreground))] leading-relaxed">{t.wallet.payNote}</p>
+            <button onClick={() => setPayOpen(false)} className="btn btn-outline btn-sm w-full mt-3">{t.common.cancel}</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
